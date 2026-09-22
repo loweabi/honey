@@ -8,37 +8,29 @@ import { useToast } from '../../state/ToastContext';
 import type { Customer } from '../../types';
 import { Banner } from '../ui/Banner';
 import { Button } from '../ui/Button';
-import { MoneyField, TextField } from '../ui/Fields';
+import { MoneyField } from '../ui/Fields';
 import { Money } from '../ui/Money';
 import { Sheet } from '../ui/Sheet';
 
-type Props = {
-  customer: Customer;
-  type: 'PAYMENT' | 'UTANG';
-  onClose: () => void;
-};
-
-/** Record a payment or add utang: amount in, new balance shown before confirming. */
-export function CustomerMoneySheet({ customer, type, onClose }: Props) {
+/** Record a payment toward a customer's balance. */
+export function CustomerMoneySheet({ customer, onClose }: { customer: Customer; onClose: () => void }) {
   const { reloadCustomers } = useStore();
   const toast = useToast();
   const [amount, setAmount] = useState('');
-  const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const isPayment = type === 'PAYMENT';
   const entered = parseAmount(amount) ?? 0;
-  const newBalance = customer.balance + (isPayment ? -entered : entered);
+  const newBalance = Math.max(0, customer.balance - entered);
 
   async function save() {
-    const result = validateMoneyEntry(amount, isPayment ? customer.balance : undefined);
+    const result = validateMoneyEntry(amount, customer.balance);
     if (!result.ok) return setError(result.message);
     setSaving(true);
     try {
-      await recordCustomerTransaction(customer.id, type, result.value, notes);
+      await recordCustomerTransaction(customer.id, 'PAYMENT', result.value, '');
       await reloadCustomers();
-      toast(isPayment ? 'PAYMENT RECORDED' : 'UTANG ADDED');
+      toast('PAYMENT RECORDED');
       onClose();
     } catch (e) {
       setError(messageOf(e, 'Something went wrong while saving. Nothing was changed.'));
@@ -48,11 +40,11 @@ export function CustomerMoneySheet({ customer, type, onClose }: Props) {
 
   return (
     <Sheet
-      title={isPayment ? 'Record payment' : 'Add utang'}
+      title="Record payment"
       onClose={onClose}
       footer={
         <Button variant="honey" size="lg" full disabled={saving} onClick={save}>
-          {saving ? 'SAVING…' : isPayment ? 'CONFIRM PAYMENT' : 'CONFIRM UTANG'}
+          {saving ? 'SAVING…' : 'CONFIRM PAYMENT'}
         </Button>
       }
     >
@@ -69,7 +61,7 @@ export function CustomerMoneySheet({ customer, type, onClose }: Props) {
           <Money value={customer.balance} className="text-2xl" />
         </div>
         <MoneyField
-          label={isPayment ? 'Payment amount' : 'Utang amount'}
+          label="Payment amount"
           value={amount}
           autoFocus
           placeholder="0"
@@ -78,22 +70,14 @@ export function CustomerMoneySheet({ customer, type, onClose }: Props) {
             setError(null);
           }}
         />
-        {isPayment && customer.balance > 0 && (
+        {customer.balance > 0 && (
           <Button size="sm" onClick={() => setAmount(String(customer.balance))}>
             Pay full balance
           </Button>
         )}
-        {!isPayment && (
-          <TextField
-            label="What was it for? (optional)"
-            value={notes}
-            autoComplete="off"
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        )}
         <div className="flex items-center justify-between border-2 border-ink bg-honey-wash px-3 py-3">
           <span className="font-display text-lg font-bold">New balance</span>
-          <Money value={Math.max(0, newBalance)} className="text-3xl" />
+          <Money value={newBalance} className="text-3xl" />
         </div>
         {error && <Banner tone="error">{error}</Banner>}
         <button type="submit" hidden />

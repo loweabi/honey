@@ -8,6 +8,7 @@ import { Banner } from '../ui/Banner';
 import { Button } from '../ui/Button';
 import { Money } from '../ui/Money';
 import { Tag } from '../ui/Tag';
+import { AddUtangSheet } from './AddUtangSheet';
 import { CustomerMoneySheet } from './CustomerMoneySheet';
 
 const typeLabel = { UTANG: 'Utang', PAYMENT: 'Payment', ADJUSTMENT: 'Adjustment' } as const;
@@ -49,7 +50,8 @@ export function CustomerCard({ customer }: { customer: Customer }) {
       </div>
 
       {showHistory && <History customer={customer} />}
-      {sheet && <CustomerMoneySheet customer={customer} type={sheet} onClose={() => setSheet(null)} />}
+      {sheet === 'PAYMENT' && <CustomerMoneySheet customer={customer} onClose={() => setSheet(null)} />}
+      {sheet === 'UTANG' && <AddUtangSheet customer={customer} onClose={() => setSheet(null)} />}
     </li>
   );
 }
@@ -101,7 +103,9 @@ function HistoryRow({ entry, balance }: { entry: LedgerEntry; balance: number })
               {items.map((i) => `${i.quantity} × ${i.product_name}`).join(', ')}
             </p>
           )}
-          {entry.notes && entry.notes !== 'Sale' && <p className="mt-0.5 text-[15px] text-ink-soft">{entry.notes}</p>}
+          {entry.notes && entry.notes !== 'Sale' && entry.notes !== 'Utang' && (
+            <p className="mt-0.5 text-[15px] text-ink-soft">{entry.notes}</p>
+          )}
         </div>
         <div className="shrink-0 text-right">
           <p className={`font-display text-xl font-extrabold tabular-nums ${isPayment ? 'text-olive' : 'text-brick'}`}>

@@ -44,3 +44,22 @@ export async function recordCustomerTransaction(
   throwIfError(error, 'Something went wrong while saving. Nothing was changed.');
   return Number(data);
 }
+
+export type UtangItemInput =
+  | { product_id: string; quantity: number }
+  | { custom_name: string; unit_price: number; quantity: number };
+
+/** Adds itemized utang (real products and/or hand-typed items). Returns the new balance. */
+export async function addUtangItems(
+  customerId: string,
+  items: UtangItemInput[],
+  expectedTotal: number,
+): Promise<number> {
+  const { data, error } = await supabase.rpc('add_utang_items', {
+    p_customer_id: customerId,
+    p_items: items,
+    p_expected_total: expectedTotal,
+  });
+  throwIfError(error, 'Something went wrong while saving the utang. Nothing was changed.');
+  return Number((data as { customer_balance: number }).customer_balance);
+}
