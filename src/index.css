@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-paper font-sans text-ink antialiased;
+  }
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+  :focus-visible {
+    outline: 3px solid #7e5300;
+    outline-offset: 2px;
+  }
+  input:focus-visible,
+  select:focus-visible {
+    outline: 3px solid #e2a61f;
+    outline-offset: 0;
+    border-color: #7e5300;
+  }
+}
+
+@layer utilities {
+  .sheet-in {
+    animation: sheet-in 180ms ease-out;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-in {
+    animation: none;
+  }
+}
