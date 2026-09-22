@@ -1,11 +1,18 @@
 import { throwIfError } from '../lib/errors';
 import { supabase } from '../lib/supabase';
 import type { Customer, LedgerEntry } from '../types';
+import { cacheData, readCache } from '../lib/offline';
 
 export async function fetchCustomers(): Promise<Customer[]> {
   const { data, error } = await supabase.from('customer_balances').select('*').order('name');
-  throwIfError(error, 'Could not load the customers. Please check your connection.');
-  return ((data ?? []) as Customer[]).map((c) => ({ ...c, balance: Number(c.balance) }));
+  if (error) {
+    const cached = await readCache<Customer[]>('customers');
+    if (cached) return cached;
+    throwIfError(error, 'Could not load the customers. Please check your connection.');
+  }
+  const customers = ((data ?? []) as Customer[]).map((c) => ({ ...c, balance: Number(c.balance) }));
+  await cacheData('customers', customers);
+  return customers;
 }
 
 export async function createCustomer(input: { name: string; phone: string; notes: string }): Promise<Customer> {

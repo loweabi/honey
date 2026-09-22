@@ -2,11 +2,18 @@ import { throwIfError } from '../lib/errors';
 import { supabase } from '../lib/supabase';
 import type { ProductInput } from '../lib/validation';
 import type { Product } from '../types';
+import { cacheData, readCache } from '../lib/offline';
 
 export async function fetchProducts(): Promise<Product[]> {
   const { data, error } = await supabase.from('products').select('*').order('name');
-  throwIfError(error, 'Could not load the products. Please check your connection.');
-  return (data ?? []) as Product[];
+  if (error) {
+    const cached = await readCache<Product[]>('products');
+    if (cached) return cached;
+    throwIfError(error, 'Could not load the products. Please check your connection.');
+  }
+  const products = (data ?? []) as Product[];
+  await cacheData('products', products);
+  return products;
 }
 
 export async function createProduct(input: ProductInput): Promise<Product> {

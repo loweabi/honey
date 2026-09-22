@@ -1,6 +1,7 @@
 import { throwIfError } from '../lib/errors';
 import { supabase } from '../lib/supabase';
 import type { PaymentType, Sale, SaleLine } from '../types';
+import { cacheData, enqueueSale, isOffline, readCache } from '../lib/offline';
 
 export type ConfirmSaleInput = {
   lines: SaleLine[];
@@ -26,6 +27,30 @@ type ConfirmSaleRow = {
 
 /** Saves the sale, takes stock out, and (for utang) adds to the customer's balance, all in one step. */
 export async function confirmSale(input: ConfirmSaleInput): Promise<ConfirmSaleResult> {
+  if (isOffline()) {
+    const products = await readCache<import('../types').Product[]>('products');
+    if (!products) throw new Error('This phone has not synced the store data yet. Connect once before using offline mode.');
+    for (const line of input.lines) {
+      const product = products.find((p) => p.id === line.productId);
+      if (!product || product.stock_quantity < line.quantity) throw new Error(`Not enough stock for ${product?.name ?? 'this item'}. Connect to refresh stock.`);
+    }
+    const updatedProducts = products.map((p) => {
+      const line = input.lines.find((l) => l.productId === p.id);
+      return line ? { ...p, stock_quantity: p.stock_quantity - line.quantity, updated_at: new Date().toISOString() } : p;
+    });
+    await cacheData('products', updatedProducts);
+    await enqueueSale(input);
+    const change = input.paymentType === 'PAID' && input.cashReceived !== null
+      ? input.cashReceived - input.expectedTotal
+      : null;
+    return {
+      total: input.expectedTotal,
+      cashReceived: input.cashReceived,
+      change,
+      customerBalance: null,
+    };
+  }
+
   const { data, error } = await supabase.rpc('confirm_sale', {
     p_items: input.lines.map((l) => ({ product_id: l.productId, quantity: l.quantity })),
     p_payment_type: input.paymentType,
@@ -64,8 +89,14 @@ export async function fetchSales(from: number, to: number): Promise<Sale[]> {
     .select(SALE_COLUMNS)
     .order('created_at', { ascending: false })
     .range(from, to);
-  throwIfError(error, 'Could not load the sales history.');
-  return toSales(data);
+  if (error) {
+    const cached = await readCache<Sale[]>(`sales:${from}:${to}`);
+    if (cached) return cached;
+    throwIfError(error, 'Could not load the sales history.');
+  }
+  const sales = toSales(data);
+  await cacheData(`sales:${from}:${to}`, sales);
+  return sales;
 }
 
 export async function fetchSalesSince(since: Date): Promise<Sale[]> {
@@ -74,6 +105,12 @@ export async function fetchSalesSince(since: Date): Promise<Sale[]> {
     .select(SALE_COLUMNS)
     .gte('created_at', since.toISOString())
     .order('created_at', { ascending: false });
-  throwIfError(error, 'Could not load today\'s sales.');
-  return toSales(data);
+  if (error) {
+    const cached = await readCache<Sale[]>('sales:today');
+    if (cached) return cached;
+    throwIfError(error, 'Could not load today\'s sales.');
+  }
+  const sales = toSales(data);
+  await cacheData('sales:today', sales);
+  return sales;
 }

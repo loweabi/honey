@@ -27,7 +27,7 @@ export default function Login() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-5 py-10">
       <Logo className="text-4xl" />
-      <p className="mb-8 mt-2 text-ink-soft">Store prices, stock and utang. For the family only.</p>
+      <p className="mb-8 mt-2 text-ink-soft">Store prices for our sari-sari store </p>
       <form
         className="space-y-4"
         onSubmit={(e) => {

@@ -1,7 +1,9 @@
-import { useEffect, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { PAGES, useRoute, type Page } from '../hooks/useRoute';
 import { useAuth } from '../state/AuthContext';
 import { Logo } from './Logo';
+import { useEffect, useState } from 'react';
+import { pendingSaleCount } from '../lib/offline';
 
 const LABELS: Record<Page, string> = {
   home: 'HOME',
@@ -17,6 +19,17 @@ const hrefFor = (page: Page) => (page === 'home' ? '#/' : `#/${page}`);
 export function Shell({ children }: { children: ReactNode }) {
   const { page } = useRoute();
   const { signOut } = useAuth();
+  const [online, setOnline] = useState(navigator.onLine);
+  const [pending, setPending] = useState(0);
+
+  useEffect(() => {
+    const refresh = () => { setOnline(navigator.onLine); void pendingSaleCount().then(setPending); };
+    refresh();
+    window.addEventListener('online', refresh);
+    window.addEventListener('offline', refresh);
+    const timer = window.setInterval(refresh, 5000);
+    return () => { window.removeEventListener('online', refresh); window.removeEventListener('offline', refresh); window.clearInterval(timer); };
+  }, []);
 
   useEffect(() => {
     document.title = page === 'home' ? 'Honey Inventory' : `${LABELS[page][0]}${LABELS[page].slice(1).toLowerCase()} · Honey Inventory`;
@@ -52,6 +65,13 @@ export function Shell({ children }: { children: ReactNode }) {
           </button>
         </div>
       </header>
+
+      {!online && (
+        <div className="border-b-2 border-ink bg-honey px-4 py-2 text-center font-display text-sm font-bold">OFFLINE MODE · New sales will sync when internet returns{pending ? ` · ${pending} pending` : ''}</div>
+      )}
+      {online && pending > 0 && (
+        <div className="border-b-2 border-ink bg-olive px-4 py-2 text-center font-display text-sm font-bold text-paper">SYNCING {pending} OFFLINE SALE{pending === 1 ? '' : 'S'}…</div>
+      )}
 
       <main className="mx-auto max-w-6xl px-4 pb-52 pt-4 md:pb-12 md:pt-6">{children}</main>
 
